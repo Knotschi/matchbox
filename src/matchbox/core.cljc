@@ -4,29 +4,60 @@
     [get-in set! reset! conj! swap! dissoc! deref parents key take take-last])
   #?(:clj
      (:import
-       [com.firebase.client
-        AuthData
+       [com.google.firebase
+        FirebaseApp
+        FirebaseOptions
+        FirebaseOptions$Builder]
+
+       ;DataSnapshot
+       ;Firebase
+       ;DatabaseError
+       ;MutableData
+       ;ServerValue
+       ;Transaction
+       ;Transaction$Handler
+       ;ValueEventListener
+       ;Firebase$CompletionListener
+       ;Transaction$Result
+       ;Logger$Level
+       ;Firebase$AuthResultHandler
+       ;Firebase$AuthStateListener
+
+       [com.google.firebase.auth
+        FirebaseAuth
+        FirebaseToken
+        FirebaseAuthException
+        ;FirebaseAuth$AuthStateListener
+        ;FirebaseAuth$AuthResultHandler
+        ]
+
+       [com.google.firebase.database
         ChildEventListener
-        Config
-        DataSnapshot
-        Firebase
-        FirebaseError
-        MutableData
-        ServerValue
-        Transaction
+        DatabaseReference$CompletionListener
+        Logger
+        Logger$Level
         Transaction$Handler
         ValueEventListener
-        Firebase$CompletionListener
-        Transaction$Result
-        Logger$Level
-        Firebase$AuthResultHandler
-        Firebase$AuthStateListener]
+        DatabaseError
+        DatabaseException
+        DatabaseReference
+        DataSnapshot
+        FirebaseDatabase
+        ;GenericTypeIndicator<T>
+        MutableData
+        OnDisconnect
+        Query
+        ServerValue
+        Transaction
+        Transaction$Result]
+
+
        (java.util HashMap ArrayList)))
   (:require
     [clojure.string :as str]
     [clojure.walk :as walk]
     [matchbox.utils :as utils]
-    [matchbox.registry :refer [register-listener register-auth-listener disable-auth-listener!]]
+    [matchbox.registry :refer [register-listener]]
     [matchbox.serialization.keyword :as keyword]
     #?(:cljs cljsjs.firebase)))
 
@@ -45,23 +76,21 @@
   (conj child-events :value))
 
 #?(:clj
-(def logger-levels
-  {:debug Logger$Level/DEBUG
-   :info  Logger$Level/INFO
-   :warn  Logger$Level/WARN
-   :error Logger$Level/ERROR
-   :none  Logger$Level/NONE}))
+   (def logger-levels
+     {:debug Logger$Level/DEBUG
+      :info Logger$Level/INFO
+      :warn Logger$Level/WARN
+      :error Logger$Level/ERROR
+      :none Logger$Level/NONE}))
 
-#_#?(:clj
-(defn set-logger-level! [key]
-  (assert (contains? logger-levels key) (format "Unknown logger level: `%s`" key))
-  (.setLogLevel ^Config (Firebase/getDefaultConfig)
-                (logger-levels key))))
-
+#?(:clj
+   (defn set-logger-level! [key]
+     (assert (contains? logger-levels key) (format "Unknown logger level: `%s`" key))
+     (.setLogLevel ^FirebaseDatabase (.getInstance FirebaseDatabase) (logger-levels key))))
 
 (def SERVER_TIMESTAMP
   #?(:clj ServerValue/TIMESTAMP
-     :cljs js/Firebase.ServerValue.TIMESTAMP))
+     :cljs js/firebase.database.ServerValue.TIMESTAMP))
 
 ;; helpers
 
@@ -70,51 +99,51 @@
 (declare reset!)
 
 (defn throw-fb-error [err & [msg]]
-  (throw (ex-info (or msg "FirebaseError") {:err err})))
+  (throw (ex-info (or msg "DatabaseError") {:err err})))
 
 #?(:clj
-    (defn- wrap-cb [cb]
-      (reify Firebase$CompletionListener
-        (^void onComplete [_ ^FirebaseError err ^Firebase ref]
-          (if err (throw-fb-error err "Cancelled") (cb ref))))))
+   (defn- wrap-cb [cb]
+     (reify DatabaseReference$CompletionListener
+       (^void onComplete [_ ^DatabaseError err ^DatabaseReference ref]
+         (if err (throw-fb-error err "Cancelled") (cb ref))))))
 
 #?(:clj
-    (defn- reify-value-listener [cb & [ds-wrapper]]
-      (let [ds-wrapper (or ds-wrapper wrap-snapshot)]
-        (reify ValueEventListener
-          (^void onDataChange [_ ^DataSnapshot ds]
-            (cb (ds-wrapper ds)))
-          (^void onCancelled [_ ^FirebaseError err]
-            (if err (throw-fb-error err "Cancelled") (cb ref)))))))
+   (defn- reify-value-listener [cb & [ds-wrapper]]
+     (let [ds-wrapper (or ds-wrapper wrap-snapshot)]
+       (reify ValueEventListener
+         (^void onDataChange [_ ^DataSnapshot ds]
+           (cb (ds-wrapper ds)))
+         (^void onCancelled [_ ^DatabaseError err]
+           (if err (throw-fb-error err "Cancelled") (cb ref)))))))
 
 #?(:clj
-    (defn- build-tx-handler [f args cb]
-      (reify Transaction$Handler
-        (^Transaction$Result doTransaction [_ ^MutableData d]
-          (let [current (hydrate (.getValue d))]
-            (reset! d (apply f current args))
-            (Transaction/success d)))
-        (^void onComplete [_ ^FirebaseError error, ^boolean committed, ^DataSnapshot d]
-          (if (and cb (not error) committed)
-            (cb (hydrate (.getValue d))))))))
+   (defn- build-tx-handler [f args cb]
+     (reify Transaction$Handler
+       (^Transaction$Result doTransaction [_ ^MutableData d]
+         (let [current (hydrate (.getValue d))]
+           (reset! d (apply f current args))
+           (Transaction/success d)))
+       (^void onComplete [_ ^DatabaseError error, ^boolean committed, ^DataSnapshot d]
+         (if (and cb (not error) committed)
+           (cb (hydrate (.getValue d))))))))
 
 #?(:clj
-    (defn reify-child-listener [{:keys [added changed moved removed]}]
-      (reify ChildEventListener
-        (^void onChildAdded [_ ^DataSnapshot d ^String _]
-          (if added (added (wrap-snapshot d))))
-        (^void onChildChanged [_ ^DataSnapshot d ^String _]
-          (if changed (changed (wrap-snapshot d))))
-        (^void onChildMoved [_ ^DataSnapshot d ^String _]
-          (if moved (moved (wrap-snapshot d))))
-        (^void onChildRemoved [_ ^DataSnapshot d]
-          (if removed (removed (wrap-snapshot d))))
-        (^void onCancelled [_ ^FirebaseError err]
-          (throw-fb-error err "Cancelled")))))
+   (defn reify-child-listener [{:keys [added changed moved removed]}]
+     (reify ChildEventListener
+       (^void onChildAdded [_ ^DataSnapshot d ^String _]
+         (if added (added (wrap-snapshot d))))
+       (^void onChildChanged [_ ^DataSnapshot d ^String _]
+         (if changed (changed (wrap-snapshot d))))
+       (^void onChildMoved [_ ^DataSnapshot d ^String _]
+         (if moved (moved (wrap-snapshot d))))
+       (^void onChildRemoved [_ ^DataSnapshot d]
+         (if removed (removed (wrap-snapshot d))))
+       (^void onCancelled [_ ^DatabaseError err]
+         (throw-fb-error err "Cancelled")))))
 
 #?(:clj
-    (defn- strip-prefix [type]
-      (-> type name (str/replace #"^.+\-" "") keyword)))
+   (defn- strip-prefix [type]
+     (-> type name (str/replace #"^.+\-" "") keyword)))
 
 (def data-config (utils/->Serializer keyword/hydrate keyword/serialize))
 
@@ -126,13 +155,13 @@
   "Last segment in reference or snapshot path"
   [ref]
   #?(:clj (.getKey ref)
-     :cljs (.key ref)))
+     :cljs (.-key ref)))
 
 (defn value
   "Data stored within snapshot"
   [snapshot]
   (hydrate
-    #?(:clj (.getValue snapshot)
+    #?(:clj (.getValue ^DataSnapshot snapshot)
        :cljs (.val snapshot))))
 
 (defn- wrap-snapshot [snapshot]
@@ -146,11 +175,56 @@
   (let [path (utils/korks->path korks)]
     (if-not (seq path) ref (.child ref path))))
 
+
+;// Initialize the app with a service account, granting admin privileges
+;FirebaseOptions options = new FirebaseOptions.Builder()
+;.setDatabaseUrl("https://databaseName.firebaseio.com")
+;.setServiceAccount(new FileInputStream("path/to/serviceAccountCredentials.json"))
+;.build();
+;FirebaseApp.initializeApp(options);
+
+
+;
+;// As an admin, the app has access to read and write all data, regardless of Security Rules
+;DatabaseReference ref = FirebaseDatabase
+;.getInstance()
+;.getReference("restricted_access/secret_document");
+;ref.addListenerForSingleValueEvent(new ValueEventListener() {
+;   @Override
+;   public void onDataChange(DataSnapshot dataSnapshot)
+;   {
+;    Object document = dataSnapshot.getValue();
+;    System.out.println(document);
+;    }
+;   });
+
+#?(:clj
+   (defn- initJavaOptions
+     ([url]
+       (initJavaOptions url ""))
+     ([url credential-path]
+      (doto (FirebaseOptions$Builder.)
+        (.setDatabaseUrl url)
+        (.setServiceAccount
+          (java.io.FileInputStream. credential-path))
+        (.build)))))
+
+(defn init
+  "Initialize a firebase"
+  ([opts]
+    #?(:clj (FirebaseApp/initializeApp opts)
+       :cljs (.. js/firebase (initializeApp (clj->js opts)))))
+  ([opts aname]
+    #?(:clj (FirebaseApp/initializeApp opts aname)
+       :cljs (.. js/firebase (initializeApp (clj->js opts) aname)))))
+
 (defn connect
   "Create a reference for firebase"
   ([url]
-   #?(:clj (Firebase. url)
-      :cljs (js/Firebase. url)))
+    #?(:clj (let [creds (env )
+                  opts (initJavaOptions url)]
+              (Firebase. url))
+       :cljs (js/firebase. url)))
   ([url korks]
    (get-in (connect url) korks)))
 
@@ -185,9 +259,9 @@
 
 (defn reset! [ref val & [cb]]
   #?(:clj
-      (if-not cb
-        (.setValue ref (serialize val))
-        (.setValue ref (serialize val) (wrap-cb cb)))
+     (if-not cb
+       (.setValue ref (serialize val))
+       (.setValue ref (serialize val) (wrap-cb cb)))
      :cljs (.set ref (serialize val) (if cb
                                        (fn [err]
                                          (if err
@@ -209,9 +283,9 @@
 
 (defn merge! [ref val & [cb]]
   #?(:clj
-      (if-not cb
-        (.updateChildren ref (serialize val))
-        (.updateChildren ref (serialize val) (wrap-cb cb)))
+     (if-not cb
+       (.updateChildren ref (serialize val))
+       (.updateChildren ref (serialize val) (wrap-cb cb)))
      :cljs
      (.update ref (serialize val) (if cb
                                     (fn [err]
@@ -242,7 +316,7 @@
   [ref f & args]
   (let [[cb args] (utils/extract-cb args)]
     #?(:clj
-        (.runTransaction ref (build-tx-handler f args cb) true)
+       (.runTransaction ref (build-tx-handler f args cb) true)
        :cljs
        (let [f' #(-> % hydrate ((fn [x] (apply f x args))) serialize)]
          (.transaction ref f' (if cb
@@ -262,15 +336,15 @@
 
 (defn set-priority! [ref priority & [cb]]
   #?(:clj
-      (if-not cb
-        (.setPriority ref priority)
-        (.setPriority ref priority (wrap-cb cb)))
+     (if-not cb
+       (.setPriority ref priority)
+       (.setPriority ref priority (wrap-cb cb)))
      :cljs
      (.setPriority ref priority (or cb undefined))))
 
 ;;
 
-(defn ref? [x] (instance? #?(:clj Firebase :cljs js/Firebase) x))
+(defn ref? [x] (instance? #?(:clj DatabaseReference :cljs js/Firebase) x))
 
 (defn- with-ds [ref-or-ds f & [cb]]
   (if (ref? ref-or-ds)
@@ -372,12 +446,15 @@
 
 (defonce connected (atom true))
 
-(defn disconnect! []
-  #?(:cljs (.goOffline js/Firebase))
+(defn disconnect!
+  []
+  #?(:clj (.goOffline (.getInstance FirebaseDatabase))
+     :cljs (.goOffline (.database js/firebase)))
   (clojure.core/reset! connected false))
 
 (defn reconnect! []
-  #?(:cljs (.goOnline js/Firebase))
+  #?(:clj (.goOnline (.getInstance FirebaseDatabase))
+     :cljs (.goOnline (.database js/firebase)))
   (clojure.core/reset! connected true))
 
 (defn connected?
@@ -386,136 +463,119 @@
   []
   @connected)
 
-(defn on-disconnect [ref]
-  #?(:cljs (.onDisconnect ref)))
-
-(defn cancel [ref-disconnect & [cb]]
-  #?(:cljs (.cancel ref-disconnect (or cb undefined))))
+;(defn on-disconnect [ref]
+;  #?(:cljs (.onDisconnect ref)))
+;
+;(defn cancel [ref-disconnect & [cb]]
+;  #?(:cljs (.cancel ref-disconnect (or cb undefined))))
 
 ;; --------------------
 ;; auth
 
+;(defn- ensure-kw-map
+;  "Coerce java.util.HashMap and friends to keywordized maps"
+;  [data]
+;  (walk/keywordize-keys (into {} data)))
+
 #?(:cljs
-    (defn build-opts [session-only?]
-      (if session-only?
-        #js {:remember "sessionOnly"}
-        undefined)))
+   (defn- auth-data->map [auth-data]
+     (hydrate auth-data)))
 
-(defn- ensure-kw-map
-  "Coerce java.util.HashMap and friends to keywordized maps"
-  [data]
-  (walk/keywordize-keys (into {} data)))
-
-(defn- auth-data->map [auth-data]
-  #?(:cljs (hydrate auth-data)
-     :clj (if auth-data
-            {:uid           (.getUid auth-data)
-             :provider      (keyword (.getProvider auth-data))
-             :token         (.getToken auth-data)
-             :expires       (.getExpires auth-data)
-             :auth          (ensure-kw-map (.getAuth auth-data))
-             :provider-data (ensure-kw-map (.getProviderData auth-data))})))
-
-(defn wrap-auth-changed [cb]
-  #?(:cljs
+#?(:cljs
+   (defn wrap-auth-changed [cb]
      (if cb
        (fn [err info]
          (cb err (js->clj info :keywordize-keys true)))
-       identity)
-     :clj
-     (reify Firebase$AuthStateListener
-       (^void onAuthStateChanged [_ ^AuthData auth-data]
-         (if cb (cb nil (auth-data->map auth-data)))))))
-
-(defn- wrap-auth-cb [cb]
-  #?(:cljs
-      (if cb
-        (fn [err info]
-          (cb err (js->clj info :keywordize-keys true)))
-        identity)
-     :clj
-      (reify Firebase$AuthResultHandler
-        (^void onAuthenticated [_ ^AuthData auth-data]
-          (if cb (cb nil (auth-data->map auth-data))))
-        (^void onAuthenticationError [_ ^FirebaseError err]
-          (if cb (cb err nil))))))
-
-(defn create-user
-  "create-user creates a user in the Firebase built-in authentication server"
-  [ref email password & [cb]]
-  (.createUser ref
-               #?@(:cljs [#js {:email email, :password password}]
-                  :clj [email password])
-               (wrap-auth-cb cb)))
-
-(defn auth [ref email password & [cb session-only?]]
-  (.authWithPassword ref
-                     #?(:cljs #js {:email email, :password password})
-                     #?@(:clj [email password])
-                     (wrap-auth-cb cb)
-                     #?(:cljs (build-opts session-only?))))
-
-(defn auth-anon [ref & [cb session-only?]]
-  (.authAnonymously ref
-                    (wrap-auth-cb cb)
-                    ;; Note: session-only? ignored on JVM
-                    #?(:cljs (build-opts session-only?))))
-
-(defn auth-custom
-  "Authenticates a Firebase client using an authentication token or Firebase Secret."
-  ([ref secret]
-   (auth-custom ref secret nil))
-  ([ref secret cb]
-   (.authWithCustomToken ref secret (wrap-auth-cb cb)))
-  #?(:cljs
-      ([ref secret cb session-only?]
-       (.authWithCustomToken ref
-                             secret
-                             (wrap-auth-cb cb)
-                             (build-opts session-only?)))))
+       identity)))
 
 #?(:cljs
-(defn auth-with-oauth-popup
-  ([ref type]
-    (auth-with-oauth-popup ref type undefined))
-  ([ref type cb]
-    (.authWithOAuthPopup ref type (wrap-auth-cb cb)))
-  ([ref type cb options]
-   (.authWithOAuthPopup ref type (wrap-auth-cb cb) (clj->js options)))))
+   (defn- wrap-auth-cb [cb]
+     (if cb
+       (fn [err info]
+         (cb err (js->clj info :keywordize-keys true)))
+       identity)))
 
 #?(:cljs
-   (defn auth-with-oauth-redirect
-     ([ref type]
-      (auth-with-oauth-redirect ref type undefined))
-     ([ref type cb]
-      (.authWithOAuthRedirect ref type (wrap-auth-cb cb)))
-     ([ref type cb options]
-      (.authWithOAuthRedirect ref type (wrap-auth-cb cb) (clj->js options)))))
+   (defn create-user
+     "create-user creates a user in the Firebase built-in authentication server"
+     [app email password & [cb]]
+     (.. app
+         auth
+         (createUserWithEmailAndPassword email password)
+         (then (wrap-auth-cb cb)))))
+
 
 #?(:cljs
-   (defn auth-with-oauth-token
-     ([ref type token-or-obj]
-      (auth-with-oauth-token ref type token-or-obj undefined))
-     ([ref type token-or-obj cb]
-      (.authWithOAuthToken ref type token-or-obj (wrap-auth-cb cb)))
-     ([ref type token-or-obj cb options]
-      (.authWithOAuthToken ref type token-or-obj (wrap-auth-cb cb) (clj->js options)))))
+   (defn auth [app email password & [cb]]
+     (.. app
+         auth
+         (signInWithEmailAndPassword email password)
+         (then (wrape-auth-cb cb)))))
 
-(defn auth-info
-  "Returns a map of uid, provider, token, expires - or nil if there is no session"
-  [ref]
-  (auth-data->map (.getAuth ref)))
+#?(:cljs
+   (defn auth-anon [app & [cb]]
+     (.. app
+         auth
+         (signInAnonymously)
+         (then (wrap-auth-cb cb)))))
 
-;; onAuth and offAuth are not fully wrapped yet
+#?(:cljs
+   (defn auth-custom
+     "Authenticates a Firebase client using an authentication token or Firebase Secret."
+     ([app token]
+      (auth-custom app token nil))
+     ([app token cb]
+      (.. app
+          auth
+          (signInWithCustomToken token)
+          (then (wrap-auth-cb cb))))))
 
-(defn onAuth [ref cb]
-  (register-auth-listener ref cb (wrap-auth-cb cb)))
+;#?(:cljs
+;   (defn auth-with-oauth-popup
+;     ([ref type]
+;      (auth-with-oauth-popup ref type undefined))
+;     ([ref type cb]
+;      (.authWithOAuthPopup ref type (wrap-auth-cb cb)))
+;     ([ref type cb options]
+;      (.authWithOAuthPopup ref type (wrap-auth-cb cb) (clj->js options)))))
+;
+;#?(:cljs
+;   (defn auth-with-oauth-redirect
+;     ([ref type]
+;      (auth-with-oauth-redirect ref type undefined))
+;     ([ref type cb]
+;      (.authWithOAuthRedirect ref type (wrap-auth-cb cb)))
+;     ([ref type cb options]
+;      (.authWithOAuthRedirect ref type (wrap-auth-cb cb) (clj->js options)))))
+;
+;#?(:cljs
+;   (defn auth-with-oauth-token
+;     ([ref type token-or-obj]
+;      (auth-with-oauth-token ref type token-or-obj undefined))
+;     ([ref type token-or-obj cb]
+;      (.authWithOAuthToken ref type token-or-obj (wrap-auth-cb cb)))
+;     ([ref type token-or-obj cb options]
+;      (.authWithOAuthToken ref type token-or-obj (wrap-auth-cb cb) (clj->js options)))))
 
-(defn offAuth [ref cb]
-  (disable-auth-listener! ref cb))
+#?(:cljs
+   (defn auth-info
+     "Returns a map of uid, provider, token, expires - or nil if there is no session"
+     [app]
+     (auth-data->map (.currentUser (.auth app)))))
 
-(defn unauth [ref]
-  (.unauth ref))
+;;; onAuth and offAuth are not fully wrapped yet
+
+#?(:cljs
+   (defn onAuth [app cb]
+     (register-auth-listener app cb (wrap-auth-cb cb))))
+
+#?(:cljs
+   (defn offAuth [app cb]
+     (disable-auth-listener! app cb)))
+
+#?(:cljs
+   (defn unauth [app]
+     (.signOut (.auth app))))
 
 ;; nested variants
 
@@ -553,20 +613,20 @@
 
 (defn --listen-to [ref type cb render-fn]
   #?(:clj
-      (let [listener (if-not (some #{type} child-events)
-                       ;; subscribe
-                       (.addValueEventListener ref (reify-value-listener cb render-fn))
-                       (.addChildEventListener ref (reify-child-listener
-                                                     (hash-map (strip-prefix type) cb))))]
-        ;; build unsubsubscribe fn
-        (fn [] (.removeEventListener ref listener)))
+     (let [listener (if-not (some #{type} child-events)
+                      ;; subscribe
+                      (.addValueEventListener ref (reify-value-listener cb render-fn))
+                      (.addChildEventListener ref (reify-child-listener
+                                                    (hash-map (strip-prefix type) cb))))]
+       ;; build unsubsubscribe fn
+       (fn [] (.removeEventListener ref listener)))
      :cljs
-      (let [type (utils/kebab->underscore type)]
-        (let [listener (comp cb render-fn)]
-          ;; subscribe
-          (.on ref type listener)
-          ;; build unsubsubscribe fn
-          (fn [] (.off ref type listener))))))
+     (let [type (utils/kebab->underscore type)]
+       (let [listener (comp cb render-fn)]
+         ;; subscribe
+         (.on ref type listener)
+         ;; build unsubsubscribe fn
+         (fn [] (.off ref type listener))))))
 
 (defn- -listen-to [ref type cb & [render-fn]]
   (let [render-fn (or render-fn wrap-snapshot)]
