@@ -38,7 +38,42 @@
   (let [provider (doto (js/firebase.auth.FacebookAuthProvider.)
                    (.addScope "email")
                    (.addScope "user_friends"))]
-    (.then (.signInWithPopup (js/firebase.auth) provider) #(cb nil %) #(cb % nil))))                                   
+    (.then (.signInWithPopup (js/firebase.auth) provider) #(cb nil %) #(cb % nil))))  
+
+
+(ns common.firebase
+  (:require
+    [clojure.walk :refer [prewalk postwalk]]
+    [clojure.string :as s]))
+
+(defn hydrate-keys
+  [m]
+  (let [replace-f (fn [str] (s/replace-first (s/replace str "/" "-") "_" "/"))
+        f (fn [[k v]]
+            (if (keyword? k)
+              (let [parsed #?(:cljs (js/parseInt (name k))
+                              :clj (try (Integer/parseInt (name k)) (catch NumberFormatException _ nil)))]
+                (if-not #?(:cljs (js/isNaN parsed)
+                           :clj (nil? parsed))
+                  [parsed v]
+                  [(keyword (replace-f (name k))) v]))
+              [k v]))]
+    ;; only apply to maps
+    (postwalk (fn [x] (if (map? x) (into {} (map f x)) x)) m)))
+
+(defn ignite-keys
+  "Recursively transforms all map keys from namespaced keywords to strings with underscores."
+  [m]
+  (let [f (fn [[k v]]
+            (if
+              (keyword? k)
+              [(s/replace
+                 (str (when (namespace k)
+                                 (str (namespace k) "_"))
+                               (name k)) "." "-") v]
+              [(s/replace k "." "-") v]))]
+    ;; only apply to maps
+    (postwalk (fn [x] (if (map? x) (into {} (map f x)) x)) m)))
 ```
 
 # Old README
