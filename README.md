@@ -1,3 +1,48 @@
+# This is a fork to get v3 working
+
+```
+[matchbox "0.0.10-SNAPSHOT"]
+```
+
+## Example code
+
+```clojure
+(defn setup-firebase! [reconciler]
+
+  (let [apikey "..."
+        app-domain "..."
+        opts (m/init-web-options apikey app-domain)
+        app (m/init opts)
+        ref (.ref (js/firebase.database))]
+    (swap! ext-state assoc :fire ref)
+
+    (.onAuthStateChanged
+      (.auth app)
+      (fn [data]
+        (debug "AUTH DATA" data)
+
+        (if data
+          (do
+            (debug "onAuth" data)
+            (debug "AUTH UID" (.-uid data))
+            (debug "AUTH KEYS" (.keys js/Object data))
+            (om/merge! reconciler {:ui/auth data})
+            (listen-data ref data reconciler))
+          (do
+            (debug "deAuthed")
+            (om/merge! reconciler {:ui/auth nil
+                                   :ui/user-data nil})))))))
+
+(defn auth-facebook [cb]
+  (debug "NEW FACEBOOK AUTH")
+  (let [provider (doto (js/firebase.auth.FacebookAuthProvider.)
+                   (.addScope "email")
+                   (.addScope "user_friends"))]
+    (.then (.signInWithPopup (js/firebase.auth) provider) #(cb nil %) #(cb % nil))))                                   
+```
+
+# Old README
+
 ![Matchbox - Firebase bindings for Clojure(script)](https://cloud.githubusercontent.com/assets/881351/6866974/0c503f46-d486-11e4-9b88-6e0c833afeb0.png)
 
 
@@ -29,8 +74,6 @@ Quick spin to get some basic flavour:
 
 ```clojure
 (require '[matchbox.core :as m])
-
-(def root (m/connect "https://<app>.firebaseio.com"))
 
 (m/auth-anon root)
 
