@@ -9,27 +9,10 @@
         FirebaseOptions
         FirebaseOptions$Builder]
 
-       ;DataSnapshot
-       ;Firebase
-       ;DatabaseError
-       ;MutableData
-       ;ServerValue
-       ;Transaction
-       ;Transaction$Handler
-       ;ValueEventListener
-       ;Firebase$CompletionListener
-       ;Transaction$Result
-       ;Logger$Level
-       ;Firebase$AuthResultHandler
-       ;Firebase$AuthStateListener
-
        [com.google.firebase.auth
         FirebaseAuth
         FirebaseToken
-        FirebaseAuthException
-        ;FirebaseAuth$AuthStateListener
-        ;FirebaseAuth$AuthResultHandler
-        ]
+        FirebaseAuthException]
 
        [com.google.firebase.database
         ChildEventListener
@@ -51,13 +34,15 @@
         Transaction
         Transaction$Result]
 
+       [java.io FileInputStream]
+
 
        (java.util HashMap ArrayList)))
   (:require
     [clojure.string :as str]
     [clojure.walk :as walk]
-    [matchbox.utils :as utils]
-    [matchbox.registry :refer [register-listener]]
+    [matchbox.utils :as utils :refer [data-config]]
+    [matchbox.registry :refer [register-listener #?@(:cljs [register-auth-listener disable-auth-listener!])]]
     [matchbox.serialization.keyword :as keyword]
     #?(:cljs cljsjs.firebase)))
 
@@ -145,7 +130,7 @@
    (defn- strip-prefix [type]
      (-> type name (str/replace #"^.+\-" "") keyword)))
 
-(def data-config (utils/->Serializer keyword/hydrate keyword/serialize))
+;(def data-config (utils/->Serializer keyword/hydrate keyword/serialize))
 
 (defn hydrate [x] (utils/hydrate data-config x))
 
@@ -199,15 +184,29 @@
 ;   });
 
 #?(:clj
-   (defn- initJavaOptions
-     ([url]
-       (initJavaOptions url ""))
-     ([url credential-path]
-      (doto (FirebaseOptions$Builder.)
-        (.setDatabaseUrl url)
-        (.setServiceAccount
-          (java.io.FileInputStream. credential-path))
-        (.build)))))
+   (defn init-server-options
+     ([app-domain credential-path]
+      (init-server-options app-domain credential-path nil))
+     ([app-domain credential-path worker-name]
+      (let [auth (doto (HashMap.)
+                   (.put "uid" worker-name))]
+        (.build
+          (doto (FirebaseOptions$Builder.)
+            (.setDatabaseUrl (str "https://" app-domain ".firebaseio.com"))
+            (.setServiceAccount
+              (FileInputStream. ^String credential-path))
+            #(if worker-name
+                 (.setDatabaseAuthVariableOverride % auth)
+                 %)))))))
+
+#?(:cljs
+   (defn init-web-options
+     [apikey domain]
+     (let [config {:apiKey apikey
+                   :authDomain (str domain ".firebaseapp.com")
+                   :databaseURL (str "https://" domain ".firebaseio.com")
+                   :storageBucket (str domain ".appspot.com")}]
+       config)))
 
 (defn init
   "Initialize a firebase"
@@ -221,10 +220,9 @@
 (defn connect
   "Create a reference for firebase"
   ([url]
-    #?(:clj (let [creds (env )
-                  opts (initJavaOptions url)]
-              (Firebase. url))
-       :cljs (js/firebase. url)))
+    #?(:clj (-> (FirebaseDatabase/getInstance)
+                (.getReferenceFromUrl url))
+       :cljs (.refFromURL (js/firebase.database) url)))
   ([url korks]
    (get-in (connect url) korks)))
 
@@ -233,16 +231,19 @@
   [ref]
   (and ref
        #?(:clj (.getParent ref)
-          :cljs (.parent ref))))
+          :cljs (.-parent ref))))
 
 (defn parents
   "Probably don't need this. Or maybe we want more zipper nav (siblings, in-order, etc)"
   [ref]
   (take-while identity (iterate parent (parent ref))))
 
-(defn deref [ref cb]
-  #?(:clj (.addListenerForSingleValueEvent ref (reify-value-listener cb value))
-     :cljs (.once ref "value" (comp cb value))))
+(defn deref
+  ([ref cb]
+    (deref ref cb nil))
+  ([ref cb err-fn]
+    #?(:clj (.addListenerForSingleValueEvent ref (reify-value-listener cb value))
+       :cljs (.once ref "value" (comp cb value) err-fn))))
 
 (defn- get-children [snapshot]
   (mapv value
@@ -344,7 +345,7 @@
 
 ;;
 
-(defn ref? [x] (instance? #?(:clj DatabaseReference :cljs js/Firebase) x))
+(defn ref? [x] (instance? #?(:clj DatabaseReference :cljs js/firebase) x))
 
 (defn- with-ds [ref-or-ds f & [cb]]
   (if (ref? ref-or-ds)
@@ -448,12 +449,12 @@
 
 (defn disconnect!
   []
-  #?(:clj (.goOffline (.getInstance FirebaseDatabase))
+  #?(:clj (.goOffline (FirebaseDatabase/getInstance))
      :cljs (.goOffline (.database js/firebase)))
   (clojure.core/reset! connected false))
 
 (defn reconnect! []
-  #?(:clj (.goOnline (.getInstance FirebaseDatabase))
+  #?(:clj (.goOnline (FirebaseDatabase/getInstance))
      :cljs (.goOnline (.database js/firebase)))
   (clojure.core/reset! connected true))
 
@@ -510,7 +511,7 @@
      (.. app
          auth
          (signInWithEmailAndPassword email password)
-         (then (wrape-auth-cb cb)))))
+         (then (wrap-auth-cb cb)))))
 
 #?(:cljs
    (defn auth-anon [app & [cb]]
@@ -530,15 +531,13 @@
           (signInWithCustomToken token)
           (then (wrap-auth-cb cb))))))
 
-;#?(:cljs
-;   (defn auth-with-oauth-popup
-;     ([ref type]
-;      (auth-with-oauth-popup ref type undefined))
-;     ([ref type cb]
-;      (.authWithOAuthPopup ref type (wrap-auth-cb cb)))
-;     ([ref type cb options]
-;      (.authWithOAuthPopup ref type (wrap-auth-cb cb) (clj->js options)))))
-;
+#?(:cljs
+   (defn auth-with-oauth-popup
+     ([auth provider]
+      (.signInWithPopup auth provider))
+     ([auth provider cb]
+      (.then (.signInWithPopup auth provider) (wrap-auth-cb cb)))))
+
 ;#?(:cljs
 ;   (defn auth-with-oauth-redirect
 ;     ([ref type]

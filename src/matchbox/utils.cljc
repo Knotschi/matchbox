@@ -1,6 +1,7 @@
 (ns matchbox.utils
   (:refer-clojure :exclude [prn])
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [matchbox.serialization.keyword :as keyword]))
 
 (defn kebab->underscore [keyword]
   (-> keyword name (str/replace "-" "_")))
@@ -36,10 +37,11 @@
   (serialize [_ x] (serialize x))
   (config! [_ h s] (set! hydrate h) (set! serialize s)))
 
+(def data-config (->Serializer keyword/hydrate keyword/serialize))
+
 (defn set-date-config! [hydrate serialize]
   (-> ^Serializer
-      #?(:clj @(resolve 'matchbox.core/data-config)
-         :cljs matchbox.core/data-config)
+      data-config
       (config! hydrate serialize)))
 
 #?(:clj (def repl-out *out*))

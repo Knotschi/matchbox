@@ -13,7 +13,8 @@
    [com.google.firebase/firebase-server-sdk "3.0.1" :exclusions [org.apache.httpcomponents/httpclient]]
    [org.apache.httpcomponents/httpclient "4.5.2"]
    [cljsjs/firebase "3.0.5-rc2-0"]
-   [org.clojure/tools.namespace "0.2.11" :scope "test"]]
+   [org.clojure/tools.namespace "0.2.11" :scope "test"]
+   [doo "0.1.6"]]
 
   :aot [matchbox.clojure.android-stub]
 

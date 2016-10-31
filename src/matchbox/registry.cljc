@@ -20,32 +20,17 @@
 ;  (let [passed-cb (get-in @auth-listeners [ref cb] #?(:cljs cb))]
 ;    #?(:clj  (when passed-cb (.removeAuthStateListener ref passed-cb))
 ;       :cljs (.offAuth ref passed-cb))))
-;
-;(defn disable-auth-listener! [ref cb]
-;  (-disable-auth-listener! ref cb)
-;  (swap! auth-listeners update ref #(dissoc % cb)))
-;
-;(defn disable-auth-listeners!
-;  ([]
-;   (doseq [[ref cbs] @auth-listeners]
-;     (doseq [[_ wrapped-cb] cbs]
-;       (-disable-auth-listener! ref wrapped-cb)))
-;   (reset! auth-listeners {}))
-;  ([ref]
-;   (doseq [[_ wrapped-cb] (get @auth-listeners ref)]
-;     (-disable-auth-listener! ref wrapped-cb))
-;   (swap! auth-listeners dissoc ref)))
-
 
 #?(:cljs
    (defn register-auth-listener [app cb wrapped-cb]
-     (.onAuthStateChanged (.auth app) wrapped-cb)
-     (swap! auth-listeners update app #(assoc % cb wrapped-cb))))
+     (let [unsub-fn (.onAuthStateChanged (.auth app) wrapped-cb)]
+       (swap! auth-listeners update app #(assoc % cb unsub-fn)))))
 
 #?(:cljs
    (defn- -disable-auth-listener! [app cb]
-     (let [passed-cb (get-in @auth-listeners [app cb] cb)]
-       (passed-cb))))
+     (let [unsub-fn (get-in @auth-listeners [app cb] cb)]
+       (when unsub-fn
+         (unsub-fn)))))
 
 #?(:cljs
    (defn disable-auth-listener! [app cb]
@@ -55,14 +40,14 @@
 #?(:cljs
    (defn disable-auth-listeners!
      ([]
-      (doseq [[ref cbs] @auth-listeners]
-        (doseq [[_ wrapped-cb] cbs]
-          (-disable-auth-listener! ref wrapped-cb)))
+      (doseq [[app cbs] @auth-listeners]
+        (doseq [[cb _] cbs]
+          (-disable-auth-listener! app cb)))
       (reset! auth-listeners {}))
-     ([ref]
-      (doseq [[_ wrapped-cb] (get @auth-listeners ref)]
-        (-disable-auth-listener! ref wrapped-cb))
-      (swap! auth-listeners dissoc ref))))
+     ([app]
+      (doseq [[cb _] (get @auth-listeners app)]
+        (-disable-auth-listener! app cb))
+      (swap! auth-listeners dissoc app))))
 
 (defn register-listener [ref type unsub!]
   (swap! unsubs update-in [(str ref) type] #(set (conj % unsub!)))

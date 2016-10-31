@@ -30,24 +30,24 @@
 
 ;; auth
 
-(defn auth< [ref email password & [session-only?]]
-  (with-chan #(m/auth ref email password (chan->auth-cb %) session-only?)))
+#?(:cljs (defn auth< [ref email password & [session-only?]]
+           (with-chan #(m/auth ref email password (chan->auth-cb %) session-only?))))
 
-(defn auth-anon< [ref & [session-only?]]
-  (with-chan #(m/auth-anon ref (chan->auth-cb %) session-only?)))
+#?(:cljs (defn auth-anon< [ref & [session-only?]]
+           (with-chan #(m/auth-anon ref (chan->auth-cb %) session-only?))))
 
-(defn auth-custom<
-  "Authenticates a Firebase client using an authentication token or Firebase Secret."
-  ([ref secret]
-   (with-chan #(m/auth-custom ref secret (chan->auth-cb %))))
-  #?(:cljs
-      ([ref secret session-only?]
-       (with-chan #(m/auth-custom ref secret (chan->auth-cb %) session-only?)))))
+#?(:cljs (defn auth-custom<
+           "Authenticates a Firebase client using an authentication token or Firebase Secret."
+           ([ref secret]
+            (with-chan #(m/auth-custom ref secret (chan->auth-cb %))))
+           #_([ref secret session-only?]
+               (with-chan #(m/auth-custom ref secret (chan->auth-cb %) session-only?)))))
 
 ;; users
 
-(defn create-user< [ref email password]
-  (with-chan #(m/create-user ref email password (chan->cb-once %))))
+#?(:cljs
+   (defn create-user< [ref email password]
+     (with-chan #(m/create-user ref email password (chan->cb-once %)))))
 
 ;; async
 

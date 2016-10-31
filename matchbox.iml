@@ -13,20 +13,28 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="Leiningen: cljsjs/firebase:2.4.1-0" level="project" />
+    <orderEntry type="library" name="Leiningen: cljsjs/firebase:3.0.5-rc2-0" level="project" />
     <orderEntry type="library" name="Leiningen: cljsjs/react-dom-server:0.14.3-0" level="project" />
     <orderEntry type="library" name="Leiningen: cljsjs/react-dom:0.14.3-1" level="project" />
     <orderEntry type="library" name="Leiningen: cljsjs/react:0.14.3-0" level="project" />
     <orderEntry type="library" name="Leiningen: clojure-complete:0.2.4" level="project" />
-    <orderEntry type="library" name="Leiningen: com.fasterxml.jackson.core/jackson-annotations:2.2.2" level="project" />
-    <orderEntry type="library" name="Leiningen: com.fasterxml.jackson.core/jackson-core:2.2.2" level="project" />
-    <orderEntry type="library" name="Leiningen: com.fasterxml.jackson.core/jackson-databind:2.2.2" level="project" />
-    <orderEntry type="library" name="Leiningen: com.firebase/firebase-client-jvm:2.5.2" level="project" />
-    <orderEntry type="library" name="Leiningen: com.firebase/tubesock:0.0.12" level="project" />
+    <orderEntry type="library" name="Leiningen: com.fasterxml.jackson.core/jackson-core:2.1.3" level="project" />
+    <orderEntry type="library" name="Leiningen: com.google.api-client/google-api-client-gson:1.21.0" level="project" />
+    <orderEntry type="library" name="Leiningen: com.google.api-client/google-api-client:1.21.0" level="project" />
+    <orderEntry type="library" name="Leiningen: com.google.code.findbugs/jsr305:1.3.9" level="project" />
+    <orderEntry type="library" name="Leiningen: com.google.code.gson/gson:2.6.2" level="project" />
+    <orderEntry type="library" name="Leiningen: com.google.firebase/firebase-server-sdk:3.0.1" level="project" />
+    <orderEntry type="library" name="Leiningen: com.google.guava/guava-jdk5:17.0" level="project" />
+    <orderEntry type="library" name="Leiningen: com.google.http-client/google-http-client-gson:1.21.0" level="project" />
+    <orderEntry type="library" name="Leiningen: com.google.http-client/google-http-client-jackson2:1.21.0" level="project" />
+    <orderEntry type="library" name="Leiningen: com.google.http-client/google-http-client:1.21.0" level="project" />
     <orderEntry type="library" name="Leiningen: com.google.javascript/closure-compiler:v20151216" level="project" />
+    <orderEntry type="library" name="Leiningen: com.google.oauth-client/google-oauth-client:1.21.0" level="project" />
     <orderEntry type="library" name="Leiningen: commons-codec:1.9" level="project" />
     <orderEntry type="library" name="Leiningen: commons-logging:1.2" level="project" />
+    <orderEntry type="library" name="Leiningen: doo:0.1.6" level="project" />
     <orderEntry type="library" name="Leiningen: frankiesardo/linked:1.2.6" level="project" />
+    <orderEntry type="library" name="Leiningen: karma-reporter:0.1.0" level="project" />
     <orderEntry type="library" name="Leiningen: org.apache.httpcomponents/httpclient:4.5.2" level="project" />
     <orderEntry type="library" name="Leiningen: org.apache.httpcomponents/httpcore:4.4.4" level="project" />
     <orderEntry type="library" name="Leiningen: org.clojure/clojure:1.8.0" level="project" />
@@ -43,6 +51,7 @@
     <orderEntry type="library" name="Leiningen: org.clojure/tools.namespace:0.2.11" level="project" />
     <orderEntry type="library" name="Leiningen: org.clojure/tools.nrepl:0.2.12" level="project" />
     <orderEntry type="library" name="Leiningen: org.clojure/tools.reader:1.0.0-alpha3" level="project" />
+    <orderEntry type="library" name="Leiningen: org.json/json:20160212" level="project" />
     <orderEntry type="library" name="Leiningen: org.mozilla/rhino:1.7R5" level="project" />
     <orderEntry type="library" name="Leiningen: org.ow2.asm/asm-all:4.2" level="project" />
     <orderEntry type="library" name="Leiningen: reagent:0.6.0-alpha" level="project" />

@@ -8,16 +8,24 @@
     [#?(:clj  clojure.core.async
         :cljs cljs.core.async) :refer [<! #?@(:clj [go <!!])]]))
 
-(def db-uri "https://luminous-torch-5788.firebaseio.com/")
+;apiKey: "AIzaSyA6FhtI8zPp-HVw7x0wHfxGLKVK3Nl5kQo",
+;authDomain: "matchbox-test.firebaseapp.com",
+;databaseURL: "https://matchbox-test.firebaseio.com",
+;storageBucket: "matchbox-test.appspot.com",
+
+(def db-uri "https://matchbox-test.firebaseio.com")
 
 (def pending (atom {}))
 (def errors (atom {}))
 
 (defn random-ref []
-  (let [ref (m/connect db-uri (str (rand-int 100000)))]
+  (let [opts #?(:clj (m/init-server-options "matchbox-test" "test/matchbox/matchbox-tester-credentials.json")
+                :cljs (m/init-web-options "AIzaSyA6FhtI8zPp-HVw7x0wHfxGLKVK3Nl5kQo" "matchbox-test"))
+        _ (m/init opts)
+        rf (m/connect db-uri (str (rand-int 100000)))]
     ;; clear data once connection closed, having trouble on JVM with reflection
-    #?(:cljs (-> ref m/on-disconnect m/remove!))
-    ref))
+    #?(:cljs (-> rf .onDisconnect .remove))
+    rf))
 
 #?(:clj
 (defn cljs-env?
