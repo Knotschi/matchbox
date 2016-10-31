@@ -4,7 +4,7 @@
 [matchbox "0.0.10-SNAPSHOT"]
 ```
 
-## Example code
+## Client code
 
 ```clojure
 (defn setup-firebase! [reconciler]
@@ -39,8 +39,10 @@
                    (.addScope "email")
                    (.addScope "user_friends"))]
     (.then (.signInWithPopup (js/firebase.auth) provider) #(cb nil %) #(cb % nil))))  
+```
 
-
+## Common code
+```clojure
 (ns common.firebase
   (:require
     [clojure.walk :refer [prewalk postwalk]]
@@ -74,6 +76,33 @@
               [(s/replace k "." "-") v]))]
     ;; only apply to maps
     (postwalk (fn [x] (if (map? x) (into {} (map f x)) x)) m)))
+```
+
+## Server code
+```clojure
+(ns server.services.firebase
+  (:require [clojure.tools.logging :refer [debug info warn error]]
+            [server.services.datomic :refer [conn]]
+            [common.firebase :refer [ignite-keys hydrate-keys]]
+            [matchbox.core :as m])
+  (:import
+    (java.util HashMap)
+    (com.google.firebase FirebaseApp)
+    (com.google.firebase.database DatabaseReference FirebaseDatabase)))
+
+
+(defn setup-firebase! []
+  (let [app-domain "..."
+        creds "..."
+        opts (m/init-server-options app-domain creds)
+        app (m/init opts)]
+    app))
+
+(defn start []
+  (let [app (or (first (FirebaseApp/getApps)) (setup-firebase!))
+        ref (.getReference (FirebaseDatabase/getInstance app))]
+    (update-firebase ref conn)
+    {:app app :ref ref}))    
 ```
 
 # Old README
