@@ -201,12 +201,14 @@
 
 #?(:cljs
    (defn init-web-options
-     [apikey domain]
-     (let [config {:apiKey apikey
-                   :authDomain (str domain ".firebaseapp.com")
-                   :databaseURL (str "https://" domain ".firebaseio.com")
-                   :storageBucket (str domain ".appspot.com")}]
-       config)))
+     ([apikey domain]
+       (init-web-options apikey domain domain))
+     ([apikey domain bucket]
+      (let [config {:apiKey apikey
+                    :authDomain (str domain ".firebaseapp.com")
+                    :databaseURL (str "https://" domain ".firebaseio.com")
+                    :storageBucket (str bucket ".appspot.com")}]
+        config))))
 
 (defn init
   "Initialize a firebase"
