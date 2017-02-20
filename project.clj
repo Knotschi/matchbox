@@ -12,7 +12,7 @@
    [frankiesardo/linked "1.2.6" :scope "provided"]
    [com.google.firebase/firebase-server-sdk "3.0.1" :exclusions [org.apache.httpcomponents/httpclient]]
    [org.apache.httpcomponents/httpclient "4.5.2"]
-   [cljsjs/firebase "3.0.5-rc2-0"]
+   [cljsjs/firebase "3.5.3-0"]
    [org.clojure/tools.namespace "0.2.11" :scope "test"]
    [doo "0.1.6"]]
 
